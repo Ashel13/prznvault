@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinTrack Pro - Login</title>
+  <meta name="description" content="Log in or sign up to access your personal finance dashboard." />
+  <style>
+    /* Reuse design tokens from dashboard */
+    :root {
+      --bg: #0b0f14;
+      --panel: #111821;
+      --muted: #6b7b8d;
+      --text: #e6edf3;
+      --brand: #4cc9f0;
+      --brand-text: #0b0f14;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --ring: 0 0 0 2px rgba(76,201,240,.35);
+      --radius: 18px;
+      --gap: 14px;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --border-color: rgba(255,255,255,.1);
+      --hover-bg: rgba(255,255,255,.04);
+      --input-bg: #0c121a;
+      --pill-text: #9fb0c4;
+      --pill-bg: rgba(156,163,175,.15);
+      --pill-border: rgba(156,163,175,.25);
+    }
+
+    [data-theme="light"] {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --text: #0c1117;
+      --muted: #5b6775;
+      --brand-text: #ffffff;
+      --shadow: 0 10px 30px rgba(0,0,0,.1);
+      --border-color: #e5e7eb;
+      --hover-bg: #f3f4f6;
+      --input-bg: #f3f4f6;
+      --pill-text: #4b5563;
+      --pill-bg: #e5e7eb;
+      --pill-border: #d1d5db;
+    }
+
+    [data-theme="light"] body {
+      background-image: radial-gradient(40rem 40rem at 10% -10%, #eaf4ff 0, transparent 50%), radial-gradient(40rem 40rem at 110% 10%, #ffeaf5 0, transparent 50%);
+    }
+
+    /* Base Styles */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font: 15px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background-color: var(--bg);
+      transition: background-color 0.3s, color 0.3s;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .login-container {
+      background: var(--panel);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border-color);
+      padding: 24px;
+      max-width: 400px;
+      width: 100%;
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
+
+    .brand .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: var(--brand);
+      box-shadow: 0 0 0 6px rgba(76,201,240,.15);
+    }
+
+    .form-group {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--input-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text);
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--brand);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    button {
+      background: var(--brand);
+      color: var(--brand-text);
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      padding: 10px 16px;
+      transition: opacity 0.2s;
+    }
+
+    button:hover,
+    button:focus {
+      opacity: 0.9;
+    }
+
+    button.secondary {
+      background: var(--muted);
+    }
+
+    .error {
+      color: var(--bad);
+      font-size: 13px;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .theme-toggle label {
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .theme-toggle input {
+      display: none;
+    }
+
+    .theme-toggle .switch {
+      position: relative;
+      width: 40px;
+      height: 20px;
+      background: var(--muted);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .theme-toggle .switch::before {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      background: var(--bg);
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+
+    .theme-toggle input:checked + .switch {
+      background: var(--brand);
+    }
+
+    .theme-toggle input:checked + .switch::before {
+      transform: translateX(20px);
+    }
+
+    @media (max-width: 500px) {
+      .login-container {
+        padding: 16px;
+      }
+
+      .button-group {
+        flex-direction: column;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="brand"><span class="dot"></span> FinTrack Pro</div>
+    <form id="login-form">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="Enter your email" required aria-describedby="email-error">
+        <div id="email-error" class="error"></div>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Enter your password" required aria-describedby="password-error">
+        <div id="password-error" class="error"></div>
+      </div>
+      <div class="button-group">
+        <button type="button" class="secondary" id="signup-btn">Sign Up</button>
+        <button type="button" id="login-btn">Log In</button>
+      </div>
+    </form>
+    <div class="theme-toggle">
+      <input type="checkbox" id="theme-switch" aria-label="Toggle between light and dark theme">
+      <label for="theme-switch" class="switch"></label>
+      <label for="theme-switch">Toggle Theme</label>
+    </div>
+  </div>
+
+  <script type="module">
+    // Firebase imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyApyFXMqGf_s8rKYiqOlWLptq4n-j1IaZs",
+      authDomain: "przn-money.firebaseapp.com",
+      projectId: "przn-money",
+      storageBucket: "przn-money.firebasestorage.app",
+      messagingSenderId: "955777085736",
+      appId: "1:955777085736:web:2f34661acea75a042de01d",
+      measurementId: "G-XGE6JZ44H7"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // Theme toggle logic
+    const themeSwitch = document.getElementById('theme-switch');
+    const applyTheme = (theme) => {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('financeDashboardTheme_v2', theme);
+      themeSwitch.checked = theme === 'light';
+    };
+
+    const initTheme = () => {
+      const savedTheme = localStorage.getItem('financeDashboardTheme_v2') || 'dark';
+      applyTheme(savedTheme);
+      themeSwitch.addEventListener('change', (e) => {
+        applyTheme(e.target.checked ? 'light' : 'dark');
+      });
+    };
+
+    // Form elements
+    const loginForm = document.getElementById('login-form');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const signupBtn = document.getElementById('signup-btn');
+    const loginBtn = document.getElementById('login-btn');
+    const emailError = document.getElementById('email-error');
+    const passwordError = document.getElementById('password-error');
+
+    // Show error message
+    const showError = (element, message) => {
+      element.textContent = message;
+      element.style.display = 'block';
+    };
+
+    // Clear errors
+    const clearErrors = () => {
+      emailError.style.display = 'none';
+      passwordError.style.display = 'none';
+    };
+
+    // Validate email
+    const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+    // Sign-up handler
+    signupBtn.addEventListener('click', async () => {
+      clearErrors();
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+
+      if (!validateEmail(email)) {
+        showError(emailError, 'Please enter a valid email address.');
+        return;
+      }
+      if (password.length < 8) {
+        showError(passwordError, 'Password must be at least 8 characters.');
+        return;
+      }
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        await sendEmailVerification(userCredential.user);
+        alert('Sign-up successful! Please check your email to verify your account.');
+        loginForm.reset();
+      } catch (error) {
+        if (error.code === 'auth/email-already-in-use') {
+          showError(emailError, 'This email is already registered.');
+        } else {
+          showError(emailError, 'Sign-up failed. Please try again.');
+        }
+        console.error('Sign-up error:', error);
+      }
+    });
+
+    // Login handler
+    loginBtn.addEventListener('click', async () => {
+      clearErrors();
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+
+      if (!validateEmail(email)) {
+        showError(emailError, 'Please enter a valid email address.');
+        return;
+      }
+      if (!password) {
+        showError(passwordError, 'Please enter a password.');
+        return;
+      }
+
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        if (!userCredential.user.emailVerified) {
+          showError(emailError, 'Please verify your email before logging in.');
+          await auth.signOut();
+          return;
+        }
+        window.location.href = 'index.html';
+      } catch (error) {
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+          showError(passwordError, 'Invalid email or password.');
+        } else {
+          showError(passwordError, 'Login failed. Please try again.');
+        }
+        console.error('Login error:', error);
+      }
+    });
+
+    // Initialize theme on load
+    initTheme();
+  </script>
+</body>
+</html>

@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf--8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Personal Finance Dashboard</title>
+  <meta name="description" content="A fully interactive personal finance dashboard connected to Firestore." />
+  <style>
+    /* ====== Design Tokens & Theming ====== */
+    :root {
+      --bg: #0b0f14;
+      --panel: #111821;
+      --muted: #6b7b8d;
+      --text: #e6edf3;
+      --brand: #4cc9f0;
+      --brand-text: #0b0f14; /* Text color for on-brand elements */
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --ring: 0 0 0 2px rgba(76,201,240,.35);
+      --radius: 18px;
+      --gap: 14px;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --border-color: rgba(255,255,255,.1);
+      --hover-bg: rgba(255,255,255,.04);
+      --aside-gradient-start: #0e141b;
+      --input-bg: #0c121a;
+      --pill-text: #9fb0c4;
+      --pill-bg: rgba(156,163,175,.15);
+      --pill-border: rgba(156,163,175,.25);
+    }
+
+    [data-theme="light"] {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --text: #0c1117;
+      --muted: #5b6775;
+      --brand-text: #ffffff;
+      --shadow: 0 10px 30px rgba(0,0,0,.1);
+      --border-color: #e5e7eb;
+      --hover-bg: #f3f4f6;
+      --aside-gradient-start: #eef2f7;
+      --input-bg: #f3f4f6;
+      --pill-text: #4b5563;
+      --pill-bg: #e5e7eb;
+      --pill-border: #d1d5db;
+    }
+
+    /* Light theme specific background */
+    [data-theme="light"] body {
+      background-image: radial-gradient(40rem 40rem at 10% -10%, #eaf4ff 0, transparent 50%), radial-gradient(40rem 40rem at 110% 10%, #ffeaf5 0, transparent 50%);
+    }
+
+    /* ====== Base Styles ====== */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font: 15px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text); background-color: var(--bg);
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .app { display: grid; grid-template-columns: 260px 1fr; min-height: 100svh; }
+    aside {
+      padding: 24px 18px; background: linear-gradient(180deg, var(--aside-gradient-start), var(--panel));
+      position: sticky; top: 0; height: 100svh; overflow: auto;
+      border-right: 1px solid var(--border-color);
+      transition: background 0.3s, border-color 0.3s;
+    }
+    main { padding: 22px; }
+    h2 { color: var(--muted); }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .3px; }
+    .brand .dot { width: 10px; height: 10px; border-radius: 999px; background: var(--brand); box-shadow: 0 0 0 6px rgba(76,201,240,.15); }
+
+    /* ====== Navigation ====== */
+    nav { display: grid; gap: 6px; margin: 16px 0 26px; }
+    .nav a {
+      display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit;
+      padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border-color);
+      background: transparent; transition: outline 0.2s, background-color 0.2s;
+    }
+    .nav a:hover, .nav a:focus { outline: var(--ring); background: var(--hover-bg); }
+    .nav .pill { margin-left: auto; font-size: 12px; color: var(--pill-text); padding: .5px 8px; border-radius: 999px; background: var(--pill-bg); border: 1px solid var(--pill-border); }
+
+    /* ====== Theme Toggle Switch ====== */
+    .theme-toggle { display: flex; align-items: center; gap: 8px; margin: 24px 0; }
+    .theme-toggle label { color: var(--muted); font-size: 13px; cursor: pointer; }
+    .theme-toggle input { display: none; }
+    .theme-toggle .switch {
+      position: relative; width: 40px; height: 20px; background: var(--muted); border-radius: 999px; cursor: pointer; transition: background-color 0.2s;
+    }
+    .theme-toggle .switch::before {
+      content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: var(--bg); border-radius: 50%; transition: transform 0.2s;
+    }
+    .theme-toggle input:checked + .switch { background: var(--brand); }
+    .theme-toggle input:checked + .switch::before { transform: translateX(20px); }
+
+    /* ====== Responsive Layout ====== */
+    .grid { display: grid; gap: var(--gap); }
+    .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+    .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      aside { position: static; height: auto; }
+      .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 780px) {
+      .grid.cols-2, .grid.cols-4 { grid-template-columns: 1fr; }
+    }
+
+    /* ====== UI Components ====== */
+    .card { background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border-color); overflow: hidden; transition: background-color 0.3s, border-color 0.3s; }
+    .card > header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border-color); color: var(--muted); }
+    .card > .content { padding: 14px; }
+    .kpi .stat { font-size: 24px; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 10px 8px; border-bottom: 1px dashed var(--border-color); }
+    th { text-align: left; color: var(--muted); font-weight: 600; }
+    tbody tr:hover { background: var(--hover-bg); }
+    .right { text-align: right; }
+    .add-btn { background: var(--brand); color: var(--brand-text); font-weight: 600; border: none; border-radius: 12px; cursor: pointer; padding: 8px 14px; transition: opacity 0.2s; }
+    .add-btn:hover, .add-btn:focus { opacity: .9; }
+    .action-btn { background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 6px; transition: background 0.2s, color 0.2s; }
+    .action-btn:hover, .action-btn:focus { background: var(--hover-bg); color: var(--text); }
+    input, select, button { font: inherit; color: inherit; }
+    input[type="text"], input[type="number"], input[type="date"], select, input[type="color"] {
+      width: 100%; padding: 10px 12px; border-radius: 12px; background: var(--input-bg); border: 1px solid var(--border-color); transition: border-color 0.2s, background-color 0.2s; }
+    input[type="color"] { padding: 4px; height: 40px; }
+    input:focus, select:focus { outline: none; border-color: var(--brand); }
+    progress { width: 100%; height: 10px; border: none; background: var(--hover-bg); border-radius: 999px; overflow: hidden; }
+    progress::-webkit-progress-bar { background: var(--hover-bg); }
+    progress::-webkit-progress-value { background: linear-gradient(90deg, var(--ok), var(--brand)); }
+    progress::-moz-progress-bar { background: linear-gradient(90deg, var(--ok), var(--brand)); }
+    .donut { --size: 170px; width: var(--size); height: var(--size); border-radius: 50%; position: relative; margin: auto; background: conic-gradient(var(--panel) 0% 100%); box-shadow: var(--shadow); }
+    .donut::after { content: ""; position: absolute; inset: 18px; background: var(--panel); border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border-color); }
+    .donut .label { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 700; }
+    .legend { display: grid; gap: 8px; font-size: 13px; }
+    .legend .row { display: flex; align-items: center; gap: 8px; }
+    .legend .swatch { width: 10px; height: 10px; border-radius: 3px; }
+
+    /* ====== Modal ====== */
+    .modal-container { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 10; display: none; align-items: center; justify-content: center; }
+    .modal-content { background: var(--panel); border-radius: var(--radius); padding: 20px; width: 90%; max-width: 500px; }
+    .modal-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .modal-form label { grid-column: span 2; }
+    .modal-form label.half { grid-column: span 1; }
+    .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand"><span class="dot"></span> FinTrack Pro</div>
+      <nav class="nav">
+        <a href="#overview">Overview <span class="pill">KPI</span></a>
+        <a href="#expenses">Expenses</a>
+        <a href="#income">Income</a>
+        <a href="#investments">Investments</a>
+        <a href="#assets">Assets & Liabilities</a>
+      </nav>
+      <div class="theme-toggle">
+        <input type="checkbox" id="theme-switch" aria-label="Toggle between light and dark theme">
+        <label for="theme-switch" class="switch"></label>
+      </div>
+      <p style="color: var(--muted); font-size: 13px; line-height: 1.5;">
+        Fully interactive dashboard with data saved online in Firestore.
+      </p>
+       <div id="auth-status" style="color: var(--muted); font-size: 12px; margin-top: 20px; word-break: break-all;">Connecting...</div>
+    </aside>
+
+    <main>
+      <section id="overview" class="grid cols-4">
+        <div class="card">
+          <header><span>Income (This Month)</span></header>
+          <div class="content kpi">
+            <div>
+              <div class="stat" data-kpi="income">£0.00</div>
+              <small data-kpi="income-target">Target £3,000</small>
+            </div>
+          </div>
+          <div class="content"><progress data-kpi="income-progress" value="0" max="3000"></progress></div>
+        </div>
+        <div class="card">
+          <header><span>Expenses (This Month)</span></header>
+          <div class="content kpi">
+            <div>
+              <div class="stat" data-kpi="expenses">£0.00</div>
+              <small data-kpi="expenses-budget">Budget £2,000</small>
+            </div>
+          </div>
+          <div class="content"><progress data-kpi="expenses-progress" value="0" max="2000"></progress></div>
+        </div>
+        <div class="card">
+          <header><span>Savings</span></header>
+          <div class="content kpi">
+            <div>
+              <div class="stat" data-kpi="savings">£0.00</div>
+              <small data-kpi="savings-goal">Goal £800</small>
+            </div>
+          </div>
+          <div class="content"><progress data-kpi="savings-progress" value="0" max="800"></progress></div>
+        </div>
+        <div class="card">
+          <header><span>Total Assets</span></header>
+          <div class="content kpi">
+            <div>
+              <div class="stat" data-kpi="total-assets-grand">£0.00</div>
+              <small>Grand Total</small>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="networth-allocation" class="grid cols-2" style="margin-top: var(--gap)">
+        <div class="card">
+          <header><span>Net Worth</span></header>
+          <div class="content kpi">
+            <div>
+              <div class="stat" data-kpi="networth">£0.00</div>
+              <small>Assets minus Liabilities</small>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <header><span>Asset Allocation</span></header>
+          <div class="content" style="display: grid; grid-template-columns: 200px 1fr; gap: 12px; align-items: center;">
+            <div id="asset-donut" class="donut"><div class="label">Assets</div></div>
+            <div id="asset-legend" class="legend"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="expenses" class="grid cols-2" style="margin-top: var(--gap)">
+        <div class="card">
+          <header><span>Expenses — Breakdown</span></header>
+          <div class="content" style="display: grid; grid-template-columns: 200px 1fr; gap: 12px; align-items: center;">
+            <div id="expense-donut" class="donut"><div class="label">Expenses</div></div>
+            <div id="expense-legend" class="legend"></div>
+          </div>
+        </div>
+        <div class="card">
+          <header><span>Expenses</span><button class="add-btn" data-type="expenses">Add Expense</button></header>
+          <div class="content" style="padding-top: 0;">
+            <table aria-label="Expenses table">
+              <thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="right">Amount</th><th class="no-print"></th></tr></thead>
+              <tbody id="table-body-expenses"></tbody>
+              <tfoot><tr><th colspan="3" class="right">Total</th><th id="total-expenses" class="right">£0.00</th><th></th></tr></tfoot>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="income" class="card" style="margin-top: var(--gap)">
+        <header><span>Income — Sources</span><button class="add-btn" data-type="income">Add Income</button></header>
+        <div class="content">
+          <table aria-label="Income table">
+            <thead><tr><th>Date</th><th>Source</th><th>Type</th><th class="right">Amount</th><th class="no-print"></th></tr></thead>
+            <tbody id="table-body-income"></tbody>
+            <tfoot><tr><th colspan="3" class="right">Total</th><th id="total-income" class="right">£0.00</th><th></th></tr></tfoot>
+          </table>
+        </div>
+      </section>
+
+      <section id="investments" class="grid cols-2" style="margin-top: var(--gap)">
+        <div class="card">
+          <header><span>Investments — Portfolio Allocation</span></header>
+          <div class="content" style="display: grid; grid-template-columns: 200px 1fr; gap: 12px; align-items: center;">
+            <div id="investment-donut" class="donut"><div class="label">Portfolio</div></div>
+            <div id="investment-legend" class="legend"></div>
+          </div>
+        </div>
+        <div class="card">
+          <header><span>Investments — Holdings</span><button class="add-btn" data-type="investments">Add Investment</button></header>
+          <div class="content">
+            <table aria-label="Holdings table">
+              <thead><tr><th>Asset</th><th>Shares</th><th>Invested</th><th class="right">Market Value</th><th class="right">ROI</th><th class="no-print"></th></tr></thead>
+              <tbody id="table-body-investments"></tbody>
+              <tfoot><tr><th colspan="2" class="right">Totals</th><th id="total-invested" class="right">£0.00</th><th id="total-investments-value" class="right">£0.00</th><th id="total-roi" class="right">0.0%</th><th></th></tr></tfoot>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="assets" class="grid cols-2" style="margin-top: var(--gap)">
+        <div class="card">
+          <header><span>Bank & Cash Holdings</span><button class="add-btn" data-type="assets">Add Asset</button></header>
+          <div class="content">
+            <table aria-label="Assets table">
+              <thead><tr><th>Account</th><th>Type</th><th class="right">Balance</th><th class="no-print"></th></tr></thead>
+              <tbody id="table-body-assets"></tbody>
+              <tfoot><tr><th colspan="2">Total</th><th id="total-assets" class="right">£0.00</th><th></th></tr></tfoot>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <header><span>Liabilities</span><button class="add-btn" data-type="liabilities">Add Liability</button></header>
+          <div class="content">
+            <table aria-label="Liabilities table">
+              <thead><tr><th>Liability</th><th class="right">Amount</th><th class="no-print"></th></tr></thead>
+              <tbody id="table-body-liabilities"></tbody>
+              <tfoot><tr><th>Total</th><th id="total-liabilities" class="right">£0.00</th><th></th></tr></tfoot>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <footer>Interactive financial dashboard powered by HTML, CSS, and JavaScript.</footer>
+    </main>
+  </div>
+
+  <div id="edit-modal" class="modal-container" role="dialog" aria-labelledby="modal-title">
+    <div class="modal-content">
+      <h2 id="modal-title">Edit Entry</h2>
+      <form id="modal-form" class="modal-form"></form>
+      <div class="modal-buttons">
+        <button id="modal-cancel" class="add-btn" style="background: var(--muted)">Cancel</button>
+        <button id="modal-save" class="add-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+  // --- FIREBASE IMPORTS ---
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+  // --- FIREBASE CONFIG & INITIALIZATION ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyApyFXMqGf_s8rKYiqOlWLptq4n-j1IaZs",
+    authDomain: "przn-money.firebaseapp.com",
+    projectId: "przn-money",
+    storageBucket: "przn-money.firebasestorage.app",
+    messagingSenderId: "955777085736",
+    appId: "1:955777085736:web:2f34661acea75a042de01d",
+    measurementId: "G-XGE6JZ44H7"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  let currentUserId = null;
+
+
+  // --- STATE MANAGEMENT ---
+  const state = {
+    income: [],
+    expenses: [],
+    investments: [],
+    assets: [],
+    liabilities: [],
+  };
+
+  const THEME_KEY = 'financeDashboardTheme_v4';
+  const today = new Date().toISOString().slice(0, 10);
+
+  // --- UTILITIES ---
+  const formatCurrency = (amount) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(amount);
+  const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const debounce = (func, wait) => {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  };
+
+  // --- THEME LOGIC ---
+  const themeSwitch = document.getElementById('theme-switch');
+  const applyTheme = (theme) => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(THEME_KEY, theme);
+    if (themeSwitch) {
+      themeSwitch.checked = theme === 'light';
+    }
+  };
+  const initTheme = () => {
+    const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
+    applyTheme(savedTheme);
+    themeSwitch.addEventListener('change', (e) => {
+      applyTheme(e.target.checked ? 'light' : 'dark');
+    });
+  };
+
+  // --- FIRESTORE DATA FUNCTIONS ---
+  async function addEntry(type, data) {
+    if (!currentUserId) return console.error("No user logged in.");
+    try {
+      await addDoc(collection(db, "users", currentUserId, type), data);
+    } catch (e) {
+      console.error("Error adding document: ", e);
+    }
+  }
+
+  async function updateEntry(type, id, data) {
+    if (!currentUserId) return console.error("No user logged in.");
+    try {
+      const docRef = doc(db, "users", currentUserId, type, id);
+      await updateDoc(docRef, data);
+    } catch (e) {
+      console.error("Error updating document: ", e);
+    }
+  }
+
+  async function deleteEntry(type, id) {
+    if (!currentUserId) return console.error("No user logged in.");
+    try {
+      await deleteDoc(doc(db, "users", currentUserId, type, id));
+    } catch (e) {
+      console.error("Error deleting document: ", e);
+    }
+  }
+
+  function listenForData(type) {
+    if (!currentUserId) return;
+    onSnapshot(collection(db, "users", currentUserId, type), (snapshot) => {
+      state[type] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      renderAll();
+    });
+  }
+
+
+  // --- FORM CONFIGURATION ---
+  const formConfig = {
+    income: [
+      { name: 'date', label: 'Date', type: 'date' },
+      { name: 'source', label: 'Source', placeholder: 'e.g., Salary' },
+      { name: 'type', label: 'Type', placeholder: 'e.g., Fixed', class: 'half' },
+      { name: 'amount', label: 'Amount', type: 'number', class: 'half' },
+    ],
+    expenses: [
+      { name: 'date', label: 'Date', type: 'date' },
+      { name: 'description', label: 'Description', placeholder: 'e.g., Groceries' },
+      { name: 'category', label: 'Category', placeholder: 'e.g., Food', class: 'half' },
+      { name: 'amount', label: 'Amount', type: 'number', class: 'half' },
+      { name: 'color', label: 'Category Color', type: 'color', class: 'half' },
+    ],
+    investments: [
+      { name: 'name', label: 'Asset Name', placeholder: 'e.g., Apple Inc.' },
+      { name: 'symbol', label: 'Symbol', placeholder: 'e.g., AAPL', class: 'half' },
+      { name: 'type', label: 'Type', placeholder: 'e.g., Stocks', class: 'half' },
+      { name: 'shares', label: 'Number of Shares', type: 'number', class: 'half' },
+      { name: 'boughtPrice', label: 'Bought Price / Share', type: 'number', class: 'half' },
+      { name: 'currentPrice', label: 'Current Price / Share', type: 'number', class: 'half' },
+    ],
+    assets: [
+      { name: 'name', label: 'Account/Asset Name', placeholder: 'e.g., Lloyds Bank' },
+      { name: 'type', label: 'Type', placeholder: 'e.g., Bank, Cash', class: 'half' },
+      { name: 'value', label: 'Balance / Value', type: 'number', class: 'half' },
+    ],
+    liabilities: [
+      { name: 'name', label: 'Liability Name' },
+      { name: 'value', label: 'Amount', type: 'number' },
+    ],
+  };
+
+  // --- DOM RENDERING LOGIC ---
+  const renderTable = (type, columns) => {
+    const tableBody = document.getElementById(`table-body-${type}`);
+    if (!tableBody) return;
+    // Sort data by date if available, otherwise by name/description
+    const sortedData = [...state[type]].sort((a, b) => {
+        if (a.date && b.date) return new Date(b.date) - new Date(a.date);
+        const nameA = a.name || a.description || '';
+        const nameB = b.name || b.description || '';
+        return nameA.localeCompare(nameB);
+    });
+
+    tableBody.innerHTML = sortedData.map(item => {
+      const cells = columns.map(col => {
+        let value;
+        const invested = item.shares ? item.shares * item.boughtPrice : 0;
+        const marketValue = item.shares ? item.shares * item.currentPrice : 0;
+        switch (col) {
+          case 'date': value = item.date ? formatDate(item.date) : 'N/A'; break;
+          case 'amount':
+          case 'value': value = formatCurrency(item[col] || item.value || 0); break;
+          case 'invested': value = formatCurrency(invested); break;
+          case 'marketValue': value = formatCurrency(marketValue); break;
+          case 'roi':
+            const roi = invested > 0 ? ((marketValue - invested) / invested) * 100 : 0;
+            const roiAmount = marketValue - invested;
+            value = `<span style="color: ${roi >= 0 ? 'var(--ok)' : 'var(--bad)'}">${formatCurrency(roiAmount)} (${roi.toFixed(1)}%)</span>`;
+            break;
+          default: value = item[col];
+        }
+        const align = (typeof item[col] === 'number' || ['invested', 'roi', 'marketValue', 'amount', 'value', 'shares'].includes(col)) ? 'right' : '';
+        return `<td class="${align}">${value}</td>`;
+      }).join('');
+      return `<tr data-id="${item.id}">${cells}<td class="right no-print"><button class="action-btn" data-type="${type}" data-id="${item.id}" aria-label="Edit">✏️</button><button class="action-btn" data-type="${type}" data-id="${item.id}" aria-label="Delete">🗑️</button></td></tr>`;
+    }).join('');
+  };
+
+  const renderKPIs = () => {
+    const thisMonth = new Date().toISOString().slice(0, 7);
+    const monthlyIncome = state.income.filter(i => i.date && i.date.startsWith(thisMonth)).reduce((sum, i) => sum + i.amount, 0);
+    const monthlyExpenses = state.expenses.filter(e => e.date && e.date.startsWith(thisMonth)).reduce((sum, e) => sum + e.amount, 0);
+    const savings = monthlyIncome - monthlyExpenses;
+    const totalInvestmentsValue = state.investments.reduce((sum, i) => sum + (i.shares * i.currentPrice), 0);
+    const cashAndBankValue = state.assets.reduce((sum, a) => sum + a.value, 0);
+    const totalAssets = cashAndBankValue + totalInvestmentsValue;
+    const totalLiabilities = state.liabilities.reduce((sum, l) => sum + l.value, 0);
+    const netWorth = totalAssets - totalLiabilities;
+
+    document.querySelector('[data-kpi="income"]').textContent = formatCurrency(monthlyIncome);
+    document.querySelector('[data-kpi="expenses"]').textContent = formatCurrency(monthlyExpenses);
+    document.querySelector('[data-kpi="savings"]').textContent = formatCurrency(savings);
+    document.querySelector('[data-kpi="total-assets-grand"]').textContent = formatCurrency(totalAssets);
+    document.querySelector('[data-kpi="networth"]').textContent = formatCurrency(netWorth);
+    document.querySelector('[data-kpi="income-progress"]').value = monthlyIncome;
+    document.querySelector('[data-kpi="expenses-progress"]').value = monthlyExpenses;
+    document.querySelector('[data-kpi="savings-progress"]').value = savings;
+    document.getElementById('total-income').textContent = formatCurrency(state.income.reduce((s, i) => s + i.amount, 0));
+    document.getElementById('total-expenses').textContent = formatCurrency(state.expenses.reduce((s, i) => s + i.amount, 0));
+    document.getElementById('total-assets').textContent = formatCurrency(cashAndBankValue);
+    document.getElementById('total-liabilities').textContent = formatCurrency(totalLiabilities);
+    const totalInvested = state.investments.reduce((s, i) => s + (i.shares * i.boughtPrice), 0);
+    const totalRoi = totalInvested > 0 ? ((totalInvestmentsValue - totalInvested) / totalInvested) * 100 : 0;
+    document.getElementById('total-invested').textContent = formatCurrency(totalInvested);
+    document.getElementById('total-investments-value').textContent = formatCurrency(totalInvestmentsValue);
+    document.getElementById('total-roi').innerHTML = `<span style="color: ${totalRoi >= 0 ? 'var(--ok)' : 'var(--bad)'}">${totalRoi.toFixed(1)}%</span>`;
+  };
+
+  const renderDonutChart = (donutId, legendId, data, total, label) => {
+    const donut = document.getElementById(donutId);
+    const legend = document.getElementById(legendId);
+    if (!donut || !legend) return;
+    donut.querySelector('.label').textContent = label;
+    let cumulativePercent = 0;
+    const gradientParts = [];
+    legend.innerHTML = '';
+    if (total > 0) {
+      Object.entries(data).sort(([, a], [, b]) => b.amount - a.amount).forEach(([category, details]) => {
+        const percent = (details.amount / total) * 100;
+        const color = details.color || '#9ca3af';
+        gradientParts.push(`${color} ${cumulativePercent}% ${cumulativePercent + percent}%`);
+        cumulativePercent += percent;
+        legend.innerHTML += `<div class="row"><span class="swatch" style="background: ${color}"></span>${category} — <strong>${percent.toFixed(0)}%</strong></div>`;
+      });
+    }
+    donut.style.background = gradientParts.length ? `conic-gradient(${gradientParts.join(', ')})` : 'var(--panel)';
+  };
+
+  const renderCharts = () => {
+    const thisMonth = new Date().toISOString().slice(0, 7);
+    const monthlyExpenses = state.expenses.filter(e => e.date && e.date.startsWith(thisMonth));
+    const totalMonthlyExpenses = monthlyExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const expenseData = monthlyExpenses.reduce((acc, e) => {
+      if (!acc[e.category]) {
+        acc[e.category] = { amount: 0, color: e.color };
+      }
+      acc[e.category].amount += e.amount;
+      return acc;
+    }, {});
+    renderDonutChart('expense-donut', 'expense-legend', expenseData, totalMonthlyExpenses, 'Expenses');
+
+    const totalInvestmentsValue = state.investments.reduce((sum, i) => sum + (i.shares * i.currentPrice), 0);
+    const investmentData = state.investments.reduce((acc, i) => {
+      if (!acc[i.type]) {
+        acc[i.type] = { amount: 0, color: '#60a5fa' }; // Assign default color for now
+      }
+      acc[i.type].amount += (i.shares * i.currentPrice);
+      return acc;
+    }, {});
+    renderDonutChart('investment-donut', 'investment-legend', investmentData, totalInvestmentsValue, 'Portfolio');
+
+    const cashAndBankValue = state.assets.reduce((sum, a) => sum + a.value, 0);
+    const totalAssets = cashAndBankValue + totalInvestmentsValue;
+    const assetData = state.assets.reduce((acc, asset) => {
+      if (!acc[asset.type]) {
+        acc[asset.type] = { amount: 0, color: '#4cc9f0' }; // Assign default color for now
+      }
+      acc[asset.type].amount += asset.value;
+      return acc;
+    }, {});
+    if (totalInvestmentsValue > 0) assetData['Investments'] = { amount: totalInvestmentsValue, color: '#f59e0b' };
+    renderDonutChart('asset-donut', 'asset-legend', assetData, totalAssets, 'Assets');
+  };
+
+  const renderAll = debounce(() => {
+    renderTable('income', ['date', 'source', 'type', 'amount']);
+    renderTable('expenses', ['date', 'description', 'category', 'amount']);
+    renderTable('investments', ['name', 'shares', 'invested', 'marketValue', 'roi']);
+    renderTable('assets', ['name', 'type', 'value']);
+    renderTable('liabilities', ['name', 'value']);
+    renderKPIs();
+    renderCharts();
+  }, 50);
+
+  // --- MODAL & CRUD LOGIC ---
+  const modal = document.getElementById('edit-modal');
+  const modalForm = document.getElementById('modal-form');
+  let currentEdit = {};
+
+  const openModal = (type, mode, id = null) => {
+    currentEdit = { type, mode, id };
+    const item = mode === 'edit' ? state[type].find(i => i.id === id) : {};
+    document.getElementById('modal-title').textContent = `${mode.charAt(0).toUpperCase() + mode.slice(1)} ${type.slice(0, -1)}`;
+    modalForm.innerHTML = formConfig[type].map(field => {
+      const value = item[field.name] || (field.type === 'color' ? '#60a5fa' : (field.type === 'date' ? today : ''));
+      return `<label class="${field.class || ''}">${field.label}<input type="${field.type || 'text'}" name="${field.name}" value="${value}" placeholder="${field.placeholder || ''}" ${field.type === 'number' ? 'step="0.01"' : ''} required></label>`;
+    }).join('');
+    modal.style.display = 'flex';
+    modalForm.querySelector('input').focus();
+  };
+
+  const closeModal = () => {
+    modal.style.display = 'none';
+    modalForm.innerHTML = '';
+    currentEdit = {};
+  };
+
+  const handleSave = () => {
+    const { type, mode, id } = currentEdit;
+    const formData = new FormData(modalForm);
+    const newItemData = {};
+    for (let [key, value] of formData.entries()) {
+      const field = formConfig[type].find(f => f.name === key);
+      newItemData[key] = (field && field.type === 'number') ? parseFloat(value) : value;
+    }
+
+    if (mode === 'add') {
+      addEntry(type, newItemData);
+    } else {
+      updateEntry(type, id, newItemData);
+    }
+    
+    closeModal();
+  };
+
+  // --- EVENT LISTENERS ---
+  const setupEventListeners = () => {
+    document.querySelector('main').addEventListener('click', e => {
+      const button = e.target.closest('button.add-btn, button.action-btn');
+      if (!button) return;
+      const { type, id } = button.dataset;
+      
+      if (button.classList.contains('add-btn')) {
+        openModal(type, 'add');
+      } else if (button.getAttribute('aria-label') === 'Edit') {
+        openModal(type, 'edit', id);
+      } else if (button.getAttribute('aria-label') === 'Delete') {
+        // The confirm() dialog is removed as it's not supported in this environment.
+        // The deletion will happen immediately upon clicking. For a real app, a custom modal confirmation would be better.
+        deleteEntry(type, id);
+      }
+    });
+
+    document.getElementById('modal-cancel').addEventListener('click', closeModal);
+    document.getElementById('modal-save').addEventListener('click', handleSave);
+    modal.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+    });
+  };
+
+  // --- INITIALIZATION ---
+  onAuthStateChanged(auth, user => {
+    const authStatusDiv = document.getElementById('auth-status');
+    if (user) {
+      // User is signed in.
+      currentUserId = user.uid;
+      authStatusDiv.innerHTML = `<strong>Status:</strong> Signed In<br><strong>User ID:</strong> ${user.uid}`;
+      
+      // Start listening to all data collections
+      listenForData('income');
+      listenForData('expenses');
+      listenForData('investments');
+      listenForData('assets');
+      listenForData('liabilities');
+    } else {
+      // No user is signed in. Sign in anonymously.
+      authStatusDiv.textContent = 'Status: Not signed in. Attempting anonymous sign-in...';
+      signInAnonymously(auth).catch((error) => {
+        console.error("Anonymous sign-in failed:", error);
+        authStatusDiv.textContent = 'Error: Could not connect to the database.';
+      });
+    }
+  });
+
+  initTheme();
+  setupEventListeners();
+  renderAll(); // Initial render with empty state
+
+</script>
+</body>
+</html>
