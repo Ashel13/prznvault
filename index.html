@@ -164,7 +164,7 @@
       <p style="color: var(--muted); font-size: 13px; line-height: 1.5;">
         Fully interactive dashboard with data saved online in Firestore.
       </p>
-       <div id="auth-status" style="color: var(--muted); font-size: 12px; margin-top: 20px; word-break: break-all;">Connecting...</div>
+       <div id="auth-status" style="color: var(--muted); font-size: 12px; margin-top: 20px; word-break: break-all;">Authenticating...</div>
     </aside>
 
     <main>
@@ -321,7 +321,7 @@
 <script type="module">
   // --- FIREBASE IMPORTS ---
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-  import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
   import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
   // --- FIREBASE CONFIG & INITIALIZATION ---
@@ -577,6 +577,7 @@
   };
 
   const renderAll = debounce(() => {
+    if (!currentUserId) return; // Don't render if no user is logged in
     renderTable('income', ['date', 'source', 'type', 'amount']);
     renderTable('expenses', ['date', 'description', 'category', 'amount']);
     renderTable('investments', ['name', 'shares', 'invested', 'marketValue', 'roi']);
@@ -639,9 +640,9 @@
       } else if (button.getAttribute('aria-label') === 'Edit') {
         openModal(type, 'edit', id);
       } else if (button.getAttribute('aria-label') === 'Delete') {
-        // The confirm() dialog is removed as it's not supported in this environment.
-        // The deletion will happen immediately upon clicking. For a real app, a custom modal confirmation would be better.
-        deleteEntry(type, id);
+        if (confirm('Are you sure you want to delete this entry?')) {
+          deleteEntry(type, id);
+        }
       }
     });
 
@@ -655,10 +656,24 @@
   // --- INITIALIZATION ---
   onAuthStateChanged(auth, user => {
     const authStatusDiv = document.getElementById('auth-status');
-    if (user) {
-      // User is signed in.
+    if (user && user.emailVerified) {
+      // User is signed in and verified.
       currentUserId = user.uid;
-      authStatusDiv.innerHTML = `<strong>Status:</strong> Signed In<br><strong>User ID:</strong> ${user.uid}`;
+      authStatusDiv.innerHTML = `
+        <strong>Status:</strong> Signed In<br>
+        <strong>Email:</strong> ${user.email}<br>
+        <button id="logout-btn" class="add-btn" style="margin-top: 10px; width: 100%; background: var(--bad);">Logout</button>
+      `;
+      
+      // Add event listener for the new logout button
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        signOut(auth).then(() => {
+          window.location.href = 'login.html';
+        }).catch((error) => {
+          console.error('Logout Error:', error);
+          alert('Could not log out. Please try again.');
+        });
+      });
       
       // Start listening to all data collections
       listenForData('income');
@@ -667,12 +682,8 @@
       listenForData('assets');
       listenForData('liabilities');
     } else {
-      // No user is signed in. Sign in anonymously.
-      authStatusDiv.textContent = 'Status: Not signed in. Attempting anonymous sign-in...';
-      signInAnonymously(auth).catch((error) => {
-        console.error("Anonymous sign-in failed:", error);
-        authStatusDiv.textContent = 'Error: Could not connect to the database.';
-      });
+      // No user is signed in, or email is not verified. Redirect to login page.
+      window.location.href = 'login.html';
     }
   });
 

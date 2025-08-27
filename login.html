@@ -240,7 +240,7 @@
   <script type="module">
     // Firebase imports
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
     // Your web app's Firebase configuration
     const firebaseConfig = {
@@ -256,6 +256,13 @@
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    
+    // Redirect if already logged in
+    onAuthStateChanged(auth, (user) => {
+      if (user && user.emailVerified) {
+        window.location.href = 'index.html';
+      }
+    });
 
     // Theme toggle logic
     const themeSwitch = document.getElementById('theme-switch');
